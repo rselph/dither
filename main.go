@@ -4,6 +4,7 @@ package main
 import (
 	"flag"
 	"math"
+	"sync"
 	//	"fmt"
 	"image"
 	"image/color"
@@ -23,10 +24,16 @@ func main() {
 	flag.Parse()
 	gammaInit()
 
+	await := &sync.WaitGroup{}
 	for _, fname := range flag.Args() {
-		dithered := ditherImage(imgFromFName(fname))
-		save(dithered, fname)
+		await.Add(1)
+		go func(filename string) {
+			defer await.Done()
+			dithered := ditherImage(imgFromFName(filename))
+			save(dithered, filename)
+		}(fname)
 	}
+	await.Wait()
 }
 
 func imgFromFName(fname string) image.Image {

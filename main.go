@@ -3,6 +3,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"image"
 	"image/color"
 	"log"
@@ -59,7 +60,7 @@ func imgFromFName(fname string) image.Image {
 }
 
 func save(i image.Image, name string) {
-	w, err := os.Create(name + ".dith.tiff")
+	w, err := os.Create(fmt.Sprintf("%s.d%04d.tiff", name, horzontalBlocks))
 	if err != nil {
 		log.Fatal(err)
 	}

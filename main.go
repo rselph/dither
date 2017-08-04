@@ -3,13 +3,12 @@ package main
 
 import (
 	"flag"
-	"math"
-	"sync"
-	//	"fmt"
 	"image"
 	"image/color"
 	"log"
+	"math"
 	"os"
+	"sync"
 
 	"math/rand"
 
@@ -17,10 +16,14 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 
+	"github.com/nfnt/resize"
 	"golang.org/x/image/tiff"
 )
 
+var horzontalBlocks uint
+
 func main() {
+	flag.UintVar(&horzontalBlocks, "b", 0, "Block pixels on horizontal side")
 	flag.Parse()
 	gammaInit()
 
@@ -68,6 +71,18 @@ var white = color.Gray16{Y: 65535}
 var black = color.Gray16{Y: 0}
 
 func ditherImage(i image.Image) image.Image {
+	if horzontalBlocks == 0 {
+		return ditherImage1to1(i)
+	}
+
+	smaller := resize.Resize(horzontalBlocks, 0, i, resize.Lanczos3)
+	dith := ditherImage1to1(smaller)
+	finalWidth := uint(i.Bounds().Size().X)
+	finalHeight := uint(i.Bounds().Size().Y)
+	return resize.Resize(finalWidth, finalHeight, dith, resize.NearestNeighbor)
+}
+
+func ditherImage1to1(i image.Image) image.Image {
 	b := i.Bounds()
 	d := image.NewGray16(b)
 

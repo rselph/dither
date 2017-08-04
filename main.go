@@ -20,10 +20,14 @@ import (
 	"golang.org/x/image/tiff"
 )
 
-var horzontalBlocks uint
+var (
+	horzontalBlocks uint
+	seed            int64
+)
 
 func main() {
 	flag.UintVar(&horzontalBlocks, "b", 0, "Block pixels on horizontal side")
+	flag.Int64Var(&seed, "s", 0, "Random number seed for dithering")
 	flag.Parse()
 	gammaInit()
 
@@ -85,11 +89,12 @@ func ditherImage(i image.Image) image.Image {
 func ditherImage1to1(i image.Image) image.Image {
 	b := i.Bounds()
 	d := image.NewGray16(b)
+	r := rand.New(rand.NewSource(seed))
 
 	for y := b.Min.Y; y < b.Max.Y; y += 1 {
 		for x := b.Min.X; x < b.Max.X; x += 1 {
 			value := color.Gray16Model.Convert(i.At(x, y)).(color.Gray16)
-			rand := uint16(rand.Uint32())
+			rand := uint16(r.Uint32())
 			if rand < lut[value.Y] {
 				d.Set(x, y, white)
 			} else {

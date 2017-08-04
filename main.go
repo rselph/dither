@@ -24,11 +24,13 @@ import (
 var (
 	horzontalBlocks uint
 	seed            int64
+	smooth          bool
 )
 
 func main() {
 	flag.UintVar(&horzontalBlocks, "b", 0, "Block pixels on horizontal side")
-	flag.Int64Var(&seed, "s", 0, "Random number seed for dithering")
+	flag.Int64Var(&seed, "r", 0, "Random number seed for dithering")
+	flag.BoolVar(&smooth, "s", false, "Produce smoother look")
 	flag.Parse()
 	gammaInit()
 
@@ -60,7 +62,13 @@ func imgFromFName(fname string) image.Image {
 }
 
 func save(i image.Image, name string) {
-	w, err := os.Create(fmt.Sprintf("%s.d%04d.tiff", name, horzontalBlocks))
+	var typeName string
+	if smooth {
+		typeName = "s"
+	} else {
+		typeName = "d"
+	}
+	w, err := os.Create(fmt.Sprintf("%s.%s%04d.tiff", name, typeName, horzontalBlocks))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -84,7 +92,11 @@ func ditherImage(i image.Image) image.Image {
 	dith := ditherImage1to1(smaller)
 	finalWidth := uint(i.Bounds().Size().X)
 	finalHeight := uint(i.Bounds().Size().Y)
-	return resize.Resize(finalWidth, finalHeight, dith, resize.NearestNeighbor)
+	if smooth {
+		return resize.Resize(finalWidth, finalHeight, dith, resize.Lanczos3)
+	} else {
+		return resize.Resize(finalWidth, finalHeight, dith, resize.NearestNeighbor)
+	}
 }
 
 func ditherImage1to1(i image.Image) image.Image {

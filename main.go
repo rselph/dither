@@ -25,12 +25,16 @@ var (
 	horzontalBlocks uint
 	seed            int64
 	smooth          bool
+	gamma           float64
 )
+
+const A = 0.985
 
 func main() {
 	flag.UintVar(&horzontalBlocks, "b", 0, "Block pixels on horizontal side")
 	flag.Int64Var(&seed, "r", 0, "Random number seed for dithering")
 	flag.BoolVar(&smooth, "s", false, "Produce smoother look")
+	flag.Float64Var(&gamma, "g", 2.2, "Gamma of input image")
 	flag.Parse()
 	gammaInit()
 
@@ -118,9 +122,6 @@ func ditherImage1to1(i image.Image) image.Image {
 
 	return d
 }
-
-const A = 0.985
-const gamma = 2.2
 
 func gammaDecode(in float64) float64 {
 	return A * math.Pow(in, gamma)

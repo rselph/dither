@@ -22,16 +22,18 @@ import (
 )
 
 var (
-	horzontalBlocks uint
-	seed            int64
-	smooth          bool
-	gamma           float64
+	xBlocks int
+	yBlocks int
+	seed    int64
+	smooth  bool
+	gamma   float64
 )
 
 const A = 0.985
 
 func main() {
-	flag.UintVar(&horzontalBlocks, "b", 0, "Block pixels on horizontal side")
+	flag.IntVar(&xBlocks, "x", 0, "Block pixels on horizontal side")
+	flag.IntVar(&yBlocks, "y", 0, "Block pixels on vertical side")
 	flag.Int64Var(&seed, "r", 0, "Random number seed for dithering")
 	flag.BoolVar(&smooth, "s", false, "Produce smoother look")
 	flag.Float64Var(&gamma, "g", 2.2, "Gamma of input image")
@@ -72,7 +74,31 @@ func save(i image.Image, name string) {
 	} else {
 		typeName = "d"
 	}
-	w, err := os.Create(fmt.Sprintf("%s.%s%04d.tiff", name, typeName, horzontalBlocks))
+
+	var (
+		sizeX int
+		sizeY int
+	)
+
+	switch {
+	case xBlocks != 0 && yBlocks != 0:
+		sizeX = xBlocks
+		sizeY = yBlocks
+
+	case xBlocks == 0 && yBlocks != 0:
+		sizeX = yBlocks * i.Bounds().Size().X / i.Bounds().Size().Y
+		sizeY = yBlocks
+
+	case xBlocks != 0 && yBlocks == 0:
+		sizeX = xBlocks
+		sizeY = xBlocks * i.Bounds().Size().Y / i.Bounds().Size().X
+
+	default:
+		sizeX = i.Bounds().Size().X
+		sizeY = i.Bounds().Size().Y
+	}
+
+	w, err := os.Create(fmt.Sprintf("%s.%s%04dx%04d.tiff", name, typeName, sizeX, sizeY))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -88,11 +114,11 @@ var white = color.Gray16{Y: 65535}
 var black = color.Gray16{Y: 0}
 
 func ditherImage(i image.Image) image.Image {
-	if horzontalBlocks == 0 {
+	if xBlocks == 0 && yBlocks == 0 {
 		return ditherImage1to1(i)
 	}
 
-	smaller := resize.Resize(horzontalBlocks, 0, i, resize.Lanczos3)
+	smaller := resize.Resize(uint(xBlocks), uint(yBlocks), i, resize.Lanczos3)
 	dith := ditherImage1to1(smaller)
 	finalWidth := uint(i.Bounds().Size().X)
 	finalHeight := uint(i.Bounds().Size().Y)

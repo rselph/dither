@@ -22,11 +22,12 @@ import (
 )
 
 var (
-	xBlocks int
-	yBlocks int
-	seed    int64
-	smooth  bool
-	gamma   float64
+	xBlocks       int
+	yBlocks       int
+	seed          int64
+	smooth        bool
+	rescaleOutput bool
+	gamma         float64
 )
 
 const A = 0.985
@@ -36,6 +37,7 @@ func main() {
 	flag.IntVar(&yBlocks, "y", 0, "Block pixels on vertical side")
 	flag.Int64Var(&seed, "r", 0, "Random number seed for dithering")
 	flag.BoolVar(&smooth, "s", false, "Produce smoother look")
+	flag.BoolVar(&rescaleOutput, "o", false, "Output image is one pixel per block")
 	flag.Float64Var(&gamma, "g", 2.2, "Gamma of input image")
 	flag.Parse()
 	gammaInit()
@@ -125,7 +127,11 @@ func ditherImage(i image.Image) image.Image {
 	if smooth {
 		return resize.Resize(finalWidth, finalHeight, dith, resize.Lanczos3)
 	} else {
-		return resize.Resize(finalWidth, finalHeight, dith, resize.NearestNeighbor)
+		if rescaleOutput {
+			return dith
+		} else {
+			return resize.Resize(finalWidth, finalHeight, dith, resize.NearestNeighbor)
+		}
 	}
 }
 

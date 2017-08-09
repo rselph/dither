@@ -28,6 +28,7 @@ var (
 	smooth        bool
 	rescaleOutput bool
 	gamma         float64
+	sRGB          bool
 )
 
 const A = 0.985
@@ -39,6 +40,7 @@ func main() {
 	flag.BoolVar(&smooth, "s", false, "Produce smoother look")
 	flag.BoolVar(&rescaleOutput, "o", false, "Output image is one pixel per block")
 	flag.Float64Var(&gamma, "g", 2.2, "Gamma of input image")
+	flag.BoolVar(&sRGB, "srgb", false, "Assume sRGB input image (overrides gamma)")
 	flag.Parse()
 	gammaInit()
 
@@ -159,11 +161,29 @@ func gammaDecode(in float64) float64 {
 	return A * math.Pow(in, gamma)
 }
 
+var (
+	a  = 0.055
+	a1 = a + 1.0
+)
+
+func sRGBDecode(in float64) float64 {
+	if in <= 0.04045 {
+		return in / 12.92
+	}
+	return math.Pow((in+a)/a1, 2.4)
+}
+
 var lut []uint16
 
 func gammaInit() {
 	lut = make([]uint16, 65536)
-	for i := 0; i < 65536; i++ {
-		lut[i] = uint16(gammaDecode(float64(i)/65536.0) * 65536.0)
+	if sRGB {
+		for i := 0; i < 65536; i++ {
+			lut[i] = uint16(sRGBDecode(float64(i)/65536.0) * 65536.0)
+		}
+	} else {
+		for i := 0; i < 65536; i++ {
+			lut[i] = uint16(gammaDecode(float64(i)/65536.0) * 65536.0)
+		}
 	}
 }

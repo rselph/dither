@@ -28,7 +28,6 @@ var (
 	smooth        bool
 	rescaleOutput bool
 	gamma         float64
-	sRGB          bool
 )
 
 const A = 0.985
@@ -39,8 +38,7 @@ func main() {
 	flag.Int64Var(&seed, "r", 0, "Random number seed for dithering")
 	flag.BoolVar(&smooth, "s", false, "Produce smoother look")
 	flag.BoolVar(&rescaleOutput, "o", false, "Output image is one pixel per block")
-	flag.Float64Var(&gamma, "g", 2.2, "Gamma of input image")
-	flag.BoolVar(&sRGB, "srgb", false, "Assume sRGB input image (overrides gamma)")
+	flag.Float64Var(&gamma, "g", 0.0, "Gamma of input image. If 0.0, then assume sRGB.")
 	flag.Parse()
 	gammaInit()
 
@@ -177,7 +175,7 @@ var lut []uint16
 
 func gammaInit() {
 	lut = make([]uint16, 65536)
-	if sRGB {
+	if gamma == 0.0 {
 		for i := 0; i < 65536; i++ {
 			lut[i] = uint16(sRGBDecode(float64(i)/65536.0) * 65536.0)
 		}

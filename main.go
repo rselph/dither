@@ -126,7 +126,7 @@ func ditherImage(i image.Image) image.Image {
 	finalWidth := uint(i.Bounds().Size().X)
 	finalHeight := uint(i.Bounds().Size().Y)
 	if smooth {
-		return resize.Resize(finalWidth, finalHeight, dith, resize.Lanczos3)
+		return resize.Resize(finalWidth, finalHeight, dith, resize.Bicubic)
 	} else {
 		if rescaleOutput {
 			return dith

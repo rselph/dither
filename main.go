@@ -66,7 +66,7 @@ func imgFromFName(fname string) image.Image {
 		log.Fatal(err)
 	}
 
-	return img
+	return transcode(img, decodeLUT)
 }
 
 func save(i image.Image, name string) {
@@ -106,7 +106,8 @@ func save(i image.Image, name string) {
 	}
 	defer w.Close()
 
-	err = tiff.Encode(w, i, &tiff.Options{Compression: tiff.Deflate, Predictor: true})
+	out := transcode(i, encodeLUT)
+	err = tiff.Encode(w, out, &tiff.Options{Compression: tiff.Deflate, Predictor: true})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -143,8 +144,8 @@ func ditherImage1to1(i image.Image) image.Image {
 	for y := b.Min.Y; y < b.Max.Y; y += 1 {
 		for x := b.Min.X; x < b.Max.X; x += 1 {
 			value := color.Gray16Model.Convert(i.At(x, y)).(color.Gray16)
-			rand := uint16(r.Uint32())
-			if rand < lut[value.Y] {
+			randVal := uint16(r.Uint32())
+			if randVal < value.Y {
 				d.Set(x, y, white)
 			} else {
 				d.Set(x, y, black)
@@ -159,9 +160,10 @@ func gammaDecode(in float64) float64 {
 	return A * math.Pow(in, gamma)
 }
 
-var (
+const (
 	a  = 0.055
 	a1 = a + 1.0
+	e  = 1.0 / 2.4
 )
 
 func sRGBDecode(in float64) float64 {
@@ -171,17 +173,45 @@ func sRGBDecode(in float64) float64 {
 	return math.Pow((in+a)/a1, 2.4)
 }
 
-var lut []uint16
+func sRGBEncode(in float64) float64 {
+	if in <= 0.0031308 {
+		return in * 12.92
+	}
+	return a1*math.Pow(in, e) - a
+}
+
+var (
+	decodeLUT []uint16
+	encodeLUT []uint16
+)
 
 func gammaInit() {
-	lut = make([]uint16, 65536)
+	decodeLUT = make([]uint16, 65536)
 	if gamma == 0.0 {
 		for i := 0; i < 65536; i++ {
-			lut[i] = uint16(sRGBDecode(float64(i)/65536.0) * 65536.0)
+			decodeLUT[i] = uint16(sRGBDecode(float64(i)/65536.0) * 65536.0)
 		}
 	} else {
 		for i := 0; i < 65536; i++ {
-			lut[i] = uint16(gammaDecode(float64(i)/65536.0) * 65536.0)
+			decodeLUT[i] = uint16(gammaDecode(float64(i)/65536.0) * 65536.0)
 		}
 	}
+	encodeLUT = make([]uint16, 65536)
+	for i := 0; i < 65536; i++ {
+		encodeLUT[i] = uint16(sRGBEncode(float64(i)/65536.0) * 65536.0)
+	}
+}
+
+func transcode(in image.Image, lut []uint16) image.Image {
+	b := in.Bounds()
+	out := image.NewGray16(b)
+
+	for y := b.Min.Y; y < b.Max.Y; y += 1 {
+		for x := b.Min.X; x < b.Max.X; x += 1 {
+			value := color.Gray16Model.Convert(in.At(x, y)).(color.Gray16)
+			out.SetGray16(x, y, color.Gray16{lut[value.Y]})
+		}
+	}
+
+	return out
 }

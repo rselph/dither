@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"image"
-	"image/color"
 	"log"
 	"math"
 	"os"
@@ -16,6 +15,8 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+
+	"image/color"
 
 	"github.com/nfnt/resize"
 	"golang.org/x/image/tiff"
@@ -28,17 +29,19 @@ var (
 	smooth        bool
 	rescaleOutput bool
 	gamma         float64
+	colorDither   bool
 )
 
 const A = 0.985
 
 func main() {
-	flag.IntVar(&xBlocks, "x", 0, "Block pixels on horizontal side")
-	flag.IntVar(&yBlocks, "y", 0, "Block pixels on vertical side")
-	flag.Int64Var(&seed, "r", 0, "Random number seed for dithering")
-	flag.BoolVar(&smooth, "s", false, "Produce smoother look")
-	flag.BoolVar(&rescaleOutput, "o", false, "Output image is one pixel per block")
+	flag.IntVar(&xBlocks, "x", 0, "Blocks on horizontal side.")
+	flag.IntVar(&yBlocks, "y", 0, "Blocks on vertical side.")
+	flag.Int64Var(&seed, "r", 0, "Random number seed for dithering.")
+	flag.BoolVar(&smooth, "s", false, "Produce smoother look.")
+	flag.BoolVar(&rescaleOutput, "o", false, "Output image is one pixel per block.")
 	flag.Float64Var(&gamma, "g", 0.0, "Gamma of input image. If 0.0, then assume sRGB.")
+	flag.BoolVar(&colorDither, "c", false, "Dither in color.")
 	flag.Parse()
 	gammaInit()
 
@@ -137,6 +140,10 @@ func ditherImage(i image.Image) image.Image {
 }
 
 func ditherImage1to1(i image.Image) image.Image {
+	if colorDither {
+		return ditherImage1to1Color(i)
+	}
+
 	b := i.Bounds()
 	d := image.NewGray16(b)
 	r := rand.New(rand.NewSource(seed))
@@ -150,6 +157,41 @@ func ditherImage1to1(i image.Image) image.Image {
 			} else {
 				d.Set(x, y, black)
 			}
+		}
+	}
+
+	return d
+}
+
+func ditherImage1to1Color(i image.Image) image.Image {
+	b := i.Bounds()
+	d := image.NewRGBA64(b)
+	r := rand.New(rand.NewSource(seed))
+
+	for y := b.Min.Y; y < b.Max.Y; y += 1 {
+		for x := b.Min.X; x < b.Max.X; x += 1 {
+			rval, gval, bval, aval := i.At(x, y).RGBA()
+			if uint16(r.Uint32()) < uint16(rval) {
+				rval = 65535
+			} else {
+				rval = 0
+			}
+			if uint16(r.Uint32()) < uint16(gval) {
+				gval = 65535
+			} else {
+				gval = 0
+			}
+			if uint16(r.Uint32()) < uint16(bval) {
+				bval = 65535
+			} else {
+				bval = 0
+			}
+			d.SetRGBA64(x, y, color.RGBA64{
+				uint16(rval),
+				uint16(gval),
+				uint16(bval),
+				uint16(aval),
+			})
 		}
 	}
 
@@ -204,12 +246,17 @@ func gammaInit() {
 
 func transcode(in image.Image, lut []uint16) image.Image {
 	b := in.Bounds()
-	out := image.NewGray16(b)
+	out := image.NewRGBA64(b)
 
 	for y := b.Min.Y; y < b.Max.Y; y += 1 {
 		for x := b.Min.X; x < b.Max.X; x += 1 {
-			value := color.Gray16Model.Convert(in.At(x, y)).(color.Gray16)
-			out.SetGray16(x, y, color.Gray16{lut[value.Y]})
+			rval, gval, bval, aval := in.At(x, y).RGBA()
+			out.SetRGBA64(x, y, color.RGBA64{
+				lut[rval],
+				lut[gval],
+				lut[bval],
+				lut[aval],
+			})
 		}
 	}
 

@@ -5,18 +5,15 @@ import (
 	"flag"
 	"fmt"
 	"image"
-	"log"
-	"math"
-	"os"
-	"sync"
-
-	"math/rand"
-
+	"image/color"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
-
-	"image/color"
+	"log"
+	"math"
+	"math/rand"
+	"os"
+	"sync"
 
 	"github.com/nfnt/resize"
 	"golang.org/x/image/tiff"
@@ -261,4 +258,212 @@ func transcode(in image.Image, lut []uint16) image.Image {
 	}
 
 	return out
+}
+
+// See http://blog.ivank.net/fastest-gaussian-blur.html
+func gaussianBlur(in image.Image, radius float64) image.Image {
+	bxs := boxesForGauss(radius, 3)
+
+	out := image.NewRGBA64(in.Bounds())
+	iter1 := image.NewRGBA64(in.Bounds())
+	iter2 := image.NewRGBA64(in.Bounds())
+
+	boxBlur(in, iter1, (bxs[0]-1)/2)
+	boxBlur(iter1, iter2, (bxs[1]-1)/2)
+	boxBlur(iter2, out, (bxs[2]-1)/2)
+
+	return out
+}
+
+func boxBlur(in image.Image, out *image.RGBA64, r int) {
+	tmp := image.NewRGBA64(in.Bounds())
+	boxBlurHorizontal(in, tmp, r)
+	boxBlurTotal(tmp, out, r)
+}
+
+func boxBlurHorizontal(in image.Image, out *image.RGBA64, r int) {
+	//var iarr = 1 / (r+r+1);
+	var (
+		iarr   = 1.0 / float64(2*r+1)
+		top    = in.Bounds().Min.Y
+		bottom = in.Bounds().Max.Y
+		left   = in.Bounds().Min.X
+		right  = in.Bounds().Max.X
+	)
+
+	//for(var i=0; i<h; i++) {
+	for i := top; i < bottom; i++ {
+		//var ti = i*w, li = ti, ri = ti+r;
+		//var fv = scl[ti], lv = scl[ti+w-1], val = (r+1)*fv;
+		var (
+			ti  = left
+			li  = left
+			ri  = left + r
+			fv  = newColorVal(in.At(left, i))
+			lv  = newColorVal(in.At(right, i))
+			val = fv.times(float64(r + 1))
+		)
+
+		//for(var j=0; j<r; j++) val += scl[ti+j];
+		for j := left; j < left+r; j++ {
+			val.increment(newColorVal(in.At(i, j)))
+		}
+
+		//for(var j=0  ; j<=r ; j++) { val += scl[ri++] - fv       ;   tcl[ti++] = Math.round(val*iarr); }
+		for j := left; j <= left+r; j++ {
+			val.increment(newColorVal(in.At(i, ri)))
+			val.decrement(fv)
+			ri++
+			out.Set(i, ti, val.asColor(iarr))
+			ti++
+		}
+
+		//for(var j=r+1; j<w-r; j++) { val += scl[ri++] - scl[li++];   tcl[ti++] = Math.round(val*iarr); }
+		for j := left + r + 1; j < right-r; j++ {
+			val.increment(newColorVal(in.At(i, ri)))
+			val.decrement(newColorVal(in.At(i, li)))
+			ri++
+			li++
+			out.Set(i, ti, val.asColor(iarr))
+			ti++
+		}
+
+		//for(var j=w-r; j<w  ; j++) { val += lv        - scl[li++];   tcl[ti++] = Math.round(val*iarr); }
+		for j := right - r; j < right; j++ {
+			val.increment(lv)
+			val.decrement(newColorVal(in.At(i, li)))
+			li++
+			out.Set(i, ti, val.asColor(iarr))
+			ti++
+		}
+	}
+}
+
+func boxBlurTotal(in image.Image, out *image.RGBA64, r int) {
+	//var iarr = 1 / (r+r+1);
+	var (
+		iarr   = 1.0 / float64(2*r+1)
+		top    = in.Bounds().Min.Y
+		bottom = in.Bounds().Max.Y
+		left   = in.Bounds().Min.X
+		right  = in.Bounds().Max.X
+	)
+
+	//for(var i=0; i<w; i++) {
+	for i := left; i < right; i++ {
+		//var ti = i, li = ti, ri = ti+r*w;
+		//var fv = scl[ti], lv = scl[ti+w*(h-1)], val = (r+1)*fv;
+		var (
+			ti  = top
+			li  = top
+			ri  = top + r
+			fv  = newColorVal(in.At(i, top))
+			lv  = newColorVal(in.At(i, bottom))
+			val = fv.times(float64(r + 1))
+		)
+
+		//for(var j=0; j<r; j++) val += scl[ti+j*w];
+		for j := top; j < top+r; j++ {
+			val.increment(newColorVal(in.At(i, j)))
+		}
+
+		//for(var j=0  ; j<=r ; j++) { val += scl[ri] - fv     ;  tcl[ti] = Math.round(val*iarr);  ri+=w; ti+=w; }
+		for j := top; j <= top+r; j++ {
+			val.increment(newColorVal(in.At(i, ri)))
+			val.decrement(fv)
+			out.Set(i, ti, val.asColor(iarr))
+			ri++
+			ti++
+		}
+
+		//for(var j=r+1; j<h-r; j++) { val += scl[ri] - scl[li];  tcl[ti] = Math.round(val*iarr);  li+=w; ri+=w; ti+=w; }
+		for j := top + r + 1; j < bottom-r; j++ {
+			val.increment(newColorVal(in.At(i, ri)))
+			val.decrement(newColorVal(in.At(i, li)))
+			out.Set(i, ti, val.asColor(iarr))
+			li++
+			ri++
+			ti++
+		}
+
+		//for(var j=h-r; j<h  ; j++) { val += lv      - scl[li];  tcl[ti] = Math.round(val*iarr);  li+=w; ti+=w; }
+		for j := bottom - r; j < bottom; j++ {
+			val.increment(lv)
+			val.decrement(newColorVal(in.At(i, li)))
+			out.Set(i, ti, val.asColor(iarr))
+			li++
+			ti++
+		}
+	}
+}
+
+func boxesForGauss(sigma float64, n int) (sizes []int) {
+	wIdeal := math.Sqrt((12.0 * sigma * sigma / float64(n)) + 1.0) // Ideal averaging filter width
+	wl := int(math.Floor(wIdeal))
+	if wl%2 == 0 {
+		wl--
+	}
+	wu := wl + 2
+
+	mIdeal := (12.0*sigma*sigma - float64(n*wl*wl+4*n*wl+3*n)) / float64(-4*wl-4)
+	m := math.Round(mIdeal)
+	// var sigmaActual = Math.sqrt( (m*wl*wl + (n-m)*wu*wu - n)/12 );
+
+	sizes = make([]int, n)
+	for i := range sizes {
+		if float64(i) < m {
+			sizes[i] = wl
+		} else {
+			sizes[i] = wu
+		}
+	}
+	return
+}
+
+type colorVal struct {
+	r, g, b, a float64
+}
+
+func newColorVal(c color.Color) (out *colorVal) {
+	r, g, b, a := c.RGBA()
+	out = &colorVal{
+		r: float64(r),
+		g: float64(g),
+		b: float64(b),
+		a: float64(a),
+	}
+	return
+}
+
+func (v *colorVal) times(n float64) (product *colorVal) {
+	product = &colorVal{
+		r: v.r * n,
+		g: v.g * n,
+		b: v.b * n,
+		a: v.a * n,
+	}
+	return
+}
+
+func (v *colorVal) increment(n *colorVal) {
+	v.r += n.r
+	v.g += n.g
+	v.b += n.b
+	v.a += n.a
+}
+
+func (v *colorVal) decrement(n *colorVal) {
+	v.r -= n.r
+	v.g -= n.g
+	v.b -= n.b
+	v.a -= n.a
+}
+
+func (v *colorVal) asColor(factor float64) color.Color {
+	return &color.RGBA64{
+		R: uint16(math.Round(v.r * factor)),
+		G: uint16(math.Round(v.g * factor)),
+		B: uint16(math.Round(v.b * factor)),
+		A: uint16(math.Round(v.a * factor)),
+	}
 }

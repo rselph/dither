@@ -297,49 +297,49 @@ func boxBlurHorizontal(in image.Image, out *image.RGBA64, r int) {
 	)
 
 	//for(var i=0; i<h; i++) {
-	for i := top; i < bottom; i++ {
+	for y := top; y < bottom; y++ {
 		//var ti = i*w, li = ti, ri = ti+r;
 		//var fv = scl[ti], lv = scl[ti+w-1], val = (r+1)*fv;
 		var (
-			ti  = left
-			li  = left
-			ri  = left + r
-			fv  = newColorVal(in.At(left, i))
-			lv  = newColorVal(in.At(right, i))
+			tx  = left
+			lx  = left
+			rx  = left + r
+			fv  = newColorVal(in.At(left, y))
+			lv  = newColorVal(in.At(right-1, y))
 			val = fv.times(float64(r + 1))
 		)
 
 		//for(var j=0; j<r; j++) val += scl[ti+j];
-		for j := left; j < left+r; j++ {
-			val.increment(newColorVal(in.At(i, j)))
+		for x := left; x < left+r; x++ {
+			val.increment(newColorVal(in.At(x, y)))
 		}
 
 		//for(var j=0  ; j<=r ; j++) { val += scl[ri++] - fv       ;   tcl[ti++] = Math.round(val*iarr); }
-		for j := left; j <= left+r; j++ {
-			val.increment(newColorVal(in.At(i, ri)))
+		for x := left; x <= left+r; x++ {
+			val.increment(newColorVal(in.At(rx, y)))
 			val.decrement(fv)
-			ri++
-			out.Set(i, ti, val.asColor(iarr))
-			ti++
+			rx++
+			out.Set(tx, y, val.asColor(iarr))
+			tx++
 		}
 
 		//for(var j=r+1; j<w-r; j++) { val += scl[ri++] - scl[li++];   tcl[ti++] = Math.round(val*iarr); }
-		for j := left + r + 1; j < right-r; j++ {
-			val.increment(newColorVal(in.At(i, ri)))
-			val.decrement(newColorVal(in.At(i, li)))
-			ri++
-			li++
-			out.Set(i, ti, val.asColor(iarr))
-			ti++
+		for x := left + r + 1; x < right-r; x++ {
+			val.increment(newColorVal(in.At(rx, y)))
+			val.decrement(newColorVal(in.At(lx, y)))
+			rx++
+			lx++
+			out.Set(tx, y, val.asColor(iarr))
+			tx++
 		}
 
 		//for(var j=w-r; j<w  ; j++) { val += lv        - scl[li++];   tcl[ti++] = Math.round(val*iarr); }
-		for j := right - r; j < right; j++ {
+		for x := right - r; x < right; x++ {
 			val.increment(lv)
-			val.decrement(newColorVal(in.At(i, li)))
-			li++
-			out.Set(i, ti, val.asColor(iarr))
-			ti++
+			val.decrement(newColorVal(in.At(lx, y)))
+			lx++
+			out.Set(tx, y, val.asColor(iarr))
+			tx++
 		}
 	}
 }
@@ -355,49 +355,49 @@ func boxBlurVertical(in image.Image, out *image.RGBA64, r int) {
 	)
 
 	//for(var i=0; i<w; i++) {
-	for i := left; i < right; i++ {
+	for x := left; x < right; x++ {
 		//var ti = i, li = ti, ri = ti+r*w;
 		//var fv = scl[ti], lv = scl[ti+w*(h-1)], val = (r+1)*fv;
 		var (
-			ti  = top
-			li  = top
-			ri  = top + r
-			fv  = newColorVal(in.At(i, top))
-			lv  = newColorVal(in.At(i, bottom))
+			ty  = top
+			ly  = top
+			ry  = top + r
+			fv  = newColorVal(in.At(x, top))
+			lv  = newColorVal(in.At(x, bottom-1))
 			val = fv.times(float64(r + 1))
 		)
 
 		//for(var j=0; j<r; j++) val += scl[ti+j*w];
-		for j := top; j < top+r; j++ {
-			val.increment(newColorVal(in.At(i, j)))
+		for y := top; y < top+r; y++ {
+			val.increment(newColorVal(in.At(x, y)))
 		}
 
 		//for(var j=0  ; j<=r ; j++) { val += scl[ri] - fv     ;  tcl[ti] = Math.round(val*iarr);  ri+=w; ti+=w; }
-		for j := top; j <= top+r; j++ {
-			val.increment(newColorVal(in.At(i, ri)))
+		for y := top; y <= top+r; y++ {
+			val.increment(newColorVal(in.At(x, ry)))
 			val.decrement(fv)
-			out.Set(i, ti, val.asColor(iarr))
-			ri++
-			ti++
+			out.Set(x, ty, val.asColor(iarr))
+			ry++
+			ty++
 		}
 
 		//for(var j=r+1; j<h-r; j++) { val += scl[ri] - scl[li];  tcl[ti] = Math.round(val*iarr);  li+=w; ri+=w; ti+=w; }
-		for j := top + r + 1; j < bottom-r; j++ {
-			val.increment(newColorVal(in.At(i, ri)))
-			val.decrement(newColorVal(in.At(i, li)))
-			out.Set(i, ti, val.asColor(iarr))
-			li++
-			ri++
-			ti++
+		for y := top + r + 1; y < bottom-r; y++ {
+			val.increment(newColorVal(in.At(x, ry)))
+			val.decrement(newColorVal(in.At(x, ly)))
+			out.Set(x, ty, val.asColor(iarr))
+			ly++
+			ry++
+			ty++
 		}
 
 		//for(var j=h-r; j<h  ; j++) { val += lv      - scl[li];  tcl[ti] = Math.round(val*iarr);  li+=w; ti+=w; }
-		for j := bottom - r; j < bottom; j++ {
+		for y := bottom - r; y < bottom; y++ {
 			val.increment(lv)
-			val.decrement(newColorVal(in.At(i, li)))
-			out.Set(i, ti, val.asColor(iarr))
-			li++
-			ti++
+			val.decrement(newColorVal(in.At(x, ly)))
+			out.Set(x, ty, val.asColor(iarr))
+			ly++
+			ty++
 		}
 	}
 }

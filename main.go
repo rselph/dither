@@ -27,6 +27,7 @@ var (
 	rescaleOutput bool
 	gamma         float64
 	colorDither   bool
+	blurRadius    float64
 )
 
 const A = 0.985
@@ -39,6 +40,7 @@ func main() {
 	flag.BoolVar(&rescaleOutput, "o", false, "Output image is one pixel per block.")
 	flag.Float64Var(&gamma, "g", 0.0, "Gamma of input image. If 0.0, then assume sRGB.")
 	flag.BoolVar(&colorDither, "c", false, "Dither in color.")
+	flag.Float64Var(&blurRadius, "b", 2.0, "Blur radius (zero to disable)")
 	flag.Parse()
 	gammaInit()
 
@@ -48,6 +50,9 @@ func main() {
 		go func(filename string) {
 			defer await.Done()
 			dithered := ditherImage(imgFromFName(filename))
+			if blurRadius != 0.0 {
+				dithered = gaussianBlur(dithered, blurRadius)
+			}
 			save(dithered, filename)
 		}(fname)
 	}
@@ -278,7 +283,7 @@ func gaussianBlur(in image.Image, radius float64) image.Image {
 func boxBlur(in image.Image, out *image.RGBA64, r int) {
 	tmp := image.NewRGBA64(in.Bounds())
 	boxBlurHorizontal(in, tmp, r)
-	boxBlurTotal(tmp, out, r)
+	boxBlurVertical(tmp, out, r)
 }
 
 func boxBlurHorizontal(in image.Image, out *image.RGBA64, r int) {
@@ -339,7 +344,7 @@ func boxBlurHorizontal(in image.Image, out *image.RGBA64, r int) {
 	}
 }
 
-func boxBlurTotal(in image.Image, out *image.RGBA64, r int) {
+func boxBlurVertical(in image.Image, out *image.RGBA64, r int) {
 	//var iarr = 1 / (r+r+1);
 	var (
 		iarr   = 1.0 / float64(2*r+1)

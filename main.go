@@ -40,7 +40,7 @@ func main() {
 	flag.BoolVar(&rescaleOutput, "o", false, "Output image is one pixel per block.")
 	flag.Float64Var(&gamma, "g", 0.0, "Gamma of input image. If 0.0, then assume sRGB.")
 	flag.BoolVar(&colorDither, "c", false, "Dither in color.")
-	flag.Float64Var(&blurRadius, "b", 2.0, "Blur radius (zero to disable)")
+	flag.Float64Var(&blurRadius, "b", 1.0, "Blur radius (zero to disable)")
 	flag.Parse()
 	gammaInit()
 

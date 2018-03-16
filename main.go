@@ -270,20 +270,19 @@ func gaussianBlur(in image.Image, radius float64) image.Image {
 	bxs := boxesForGauss(radius, 3)
 
 	out := image.NewRGBA64(in.Bounds())
-	iter1 := image.NewRGBA64(in.Bounds())
-	iter2 := image.NewRGBA64(in.Bounds())
+	tmp := image.NewRGBA64(in.Bounds())
+	scratch := image.NewRGBA64(in.Bounds())
 
-	boxBlur(in, iter1, (bxs[0]-1)/2)
-	boxBlur(iter1, iter2, (bxs[1]-1)/2)
-	boxBlur(iter2, out, (bxs[2]-1)/2)
+	boxBlur(in, scratch, out, (bxs[0]-1)/2)
+	boxBlur(out, scratch, tmp, (bxs[1]-1)/2)
+	boxBlur(tmp, scratch, out, (bxs[2]-1)/2)
 
 	return out
 }
 
-func boxBlur(in image.Image, out *image.RGBA64, r int) {
-	tmp := image.NewRGBA64(in.Bounds())
-	boxBlurHorizontal(in, tmp, r)
-	boxBlurVertical(tmp, out, r)
+func boxBlur(in image.Image, scratch, out *image.RGBA64, r int) {
+	boxBlurHorizontal(in, scratch, r)
+	boxBlurVertical(scratch, out, r)
 }
 
 func boxBlurHorizontal(in image.Image, out *image.RGBA64, r int) {

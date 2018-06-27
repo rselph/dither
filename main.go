@@ -310,12 +310,12 @@ func boxBlurHorizontal(in image.Image, out *image.RGBA64, r int) {
 
 		//for(var j=0; j<r; j++) val += scl[ti+j];
 		for x := left; x < left+r; x++ {
-			val.increment(newColorVal(in.At(x, y)))
+			val.incrementInt(in.At(x, y))
 		}
 
 		//for(var j=0  ; j<=r ; j++) { val += scl[ri++] - fv       ;   tcl[ti++] = Math.round(val*iarr); }
 		for x := left; x <= left+r; x++ {
-			val.increment(newColorVal(in.At(rx, y)))
+			val.incrementInt(in.At(rx, y))
 			val.decrement(fv)
 			rx++
 			out.Set(tx, y, val.asColor(iarr))
@@ -324,8 +324,8 @@ func boxBlurHorizontal(in image.Image, out *image.RGBA64, r int) {
 
 		//for(var j=r+1; j<w-r; j++) { val += scl[ri++] - scl[li++];   tcl[ti++] = Math.round(val*iarr); }
 		for x := left + r + 1; x < right-r; x++ {
-			val.increment(newColorVal(in.At(rx, y)))
-			val.decrement(newColorVal(in.At(lx, y)))
+			val.incrementInt(in.At(rx, y))
+			val.decrementInt(in.At(lx, y))
 			rx++
 			lx++
 			out.Set(tx, y, val.asColor(iarr))
@@ -335,7 +335,7 @@ func boxBlurHorizontal(in image.Image, out *image.RGBA64, r int) {
 		//for(var j=w-r; j<w  ; j++) { val += lv        - scl[li++];   tcl[ti++] = Math.round(val*iarr); }
 		for x := right - r; x < right; x++ {
 			val.increment(lv)
-			val.decrement(newColorVal(in.At(lx, y)))
+			val.decrementInt(in.At(lx, y))
 			lx++
 			out.Set(tx, y, val.asColor(iarr))
 			tx++
@@ -368,12 +368,12 @@ func boxBlurVertical(in image.Image, out *image.RGBA64, r int) {
 
 		//for(var j=0; j<r; j++) val += scl[ti+j*w];
 		for y := top; y < top+r; y++ {
-			val.increment(newColorVal(in.At(x, y)))
+			val.incrementInt(in.At(x, y))
 		}
 
 		//for(var j=0  ; j<=r ; j++) { val += scl[ri] - fv     ;  tcl[ti] = Math.round(val*iarr);  ri+=w; ti+=w; }
 		for y := top; y <= top+r; y++ {
-			val.increment(newColorVal(in.At(x, ry)))
+			val.incrementInt(in.At(x, ry))
 			val.decrement(fv)
 			out.Set(x, ty, val.asColor(iarr))
 			ry++
@@ -382,8 +382,8 @@ func boxBlurVertical(in image.Image, out *image.RGBA64, r int) {
 
 		//for(var j=r+1; j<h-r; j++) { val += scl[ri] - scl[li];  tcl[ti] = Math.round(val*iarr);  li+=w; ri+=w; ti+=w; }
 		for y := top + r + 1; y < bottom-r; y++ {
-			val.increment(newColorVal(in.At(x, ry)))
-			val.decrement(newColorVal(in.At(x, ly)))
+			val.incrementInt(in.At(x, ry))
+			val.decrementInt(in.At(x, ly))
 			out.Set(x, ty, val.asColor(iarr))
 			ly++
 			ry++
@@ -393,7 +393,7 @@ func boxBlurVertical(in image.Image, out *image.RGBA64, r int) {
 		//for(var j=h-r; j<h  ; j++) { val += lv      - scl[li];  tcl[ti] = Math.round(val*iarr);  li+=w; ti+=w; }
 		for y := bottom - r; y < bottom; y++ {
 			val.increment(lv)
-			val.decrement(newColorVal(in.At(x, ly)))
+			val.decrementInt(in.At(x, ly))
 			out.Set(x, ty, val.asColor(iarr))
 			ly++
 			ty++
@@ -456,11 +456,27 @@ func (v *colorVal) increment(n *colorVal) {
 	v.a += n.a
 }
 
+func (v *colorVal) incrementInt(n color.Color) {
+	r, g, b, a := n.RGBA()
+	v.r += float64(r)
+	v.g += float64(g)
+	v.b += float64(b)
+	v.a += float64(a)
+}
+
 func (v *colorVal) decrement(n *colorVal) {
 	v.r -= n.r
 	v.g -= n.g
 	v.b -= n.b
 	v.a -= n.a
+}
+
+func (v *colorVal) decrementInt(n color.Color) {
+	r, g, b, a := n.RGBA()
+	v.r -= float64(r)
+	v.g -= float64(g)
+	v.b -= float64(b)
+	v.a -= float64(a)
 }
 
 func (v *colorVal) asColor(factor float64) color.Color {

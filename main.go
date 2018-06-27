@@ -148,19 +148,25 @@ func ditherImage1to1(i image.Image) image.Image {
 
 	b := i.Bounds()
 	d := image.NewGray16(b)
-	r := rand.New(rand.NewSource(seed))
 
+	wg := sync.WaitGroup{}
 	for y := b.Min.Y; y < b.Max.Y; y += 1 {
-		for x := b.Min.X; x < b.Max.X; x += 1 {
-			value := color.Gray16Model.Convert(i.At(x, y)).(color.Gray16)
-			randVal := uint16(r.Uint32())
-			if randVal < value.Y {
-				d.Set(x, y, white)
-			} else {
-				d.Set(x, y, black)
+		wg.Add(1)
+		go func(y int) {
+			defer wg.Done()
+			r := rand.New(rand.NewSource(seed + int64(y)))
+			for x := b.Min.X; x < b.Max.X; x += 1 {
+				value := color.Gray16Model.Convert(i.At(x, y)).(color.Gray16)
+				randVal := uint16(r.Uint32())
+				if randVal < value.Y {
+					d.Set(x, y, white)
+				} else {
+					d.Set(x, y, black)
+				}
 			}
-		}
+		}(y)
 	}
+	wg.Wait()
 
 	return d
 }
@@ -168,34 +174,40 @@ func ditherImage1to1(i image.Image) image.Image {
 func ditherImage1to1Color(i image.Image) image.Image {
 	b := i.Bounds()
 	d := image.NewRGBA64(b)
-	r := rand.New(rand.NewSource(seed))
 
+	wg := sync.WaitGroup{}
 	for y := b.Min.Y; y < b.Max.Y; y += 1 {
-		for x := b.Min.X; x < b.Max.X; x += 1 {
-			rval, gval, bval, aval := i.At(x, y).RGBA()
-			if uint16(r.Uint32()) < uint16(rval) {
-				rval = 65535
-			} else {
-				rval = 0
+		wg.Add(1)
+		go func(y int) {
+			defer wg.Done()
+			r := rand.New(rand.NewSource(seed + int64(y)))
+			for x := b.Min.X; x < b.Max.X; x += 1 {
+				rval, gval, bval, aval := i.At(x, y).RGBA()
+				if uint16(r.Uint32()) < uint16(rval) {
+					rval = 65535
+				} else {
+					rval = 0
+				}
+				if uint16(r.Uint32()) < uint16(gval) {
+					gval = 65535
+				} else {
+					gval = 0
+				}
+				if uint16(r.Uint32()) < uint16(bval) {
+					bval = 65535
+				} else {
+					bval = 0
+				}
+				d.SetRGBA64(x, y, color.RGBA64{
+					uint16(rval),
+					uint16(gval),
+					uint16(bval),
+					uint16(aval),
+				})
 			}
-			if uint16(r.Uint32()) < uint16(gval) {
-				gval = 65535
-			} else {
-				gval = 0
-			}
-			if uint16(r.Uint32()) < uint16(bval) {
-				bval = 65535
-			} else {
-				bval = 0
-			}
-			d.SetRGBA64(x, y, color.RGBA64{
-				uint16(rval),
-				uint16(gval),
-				uint16(bval),
-				uint16(aval),
-			})
-		}
+		}(y)
 	}
+	wg.Wait()
 
 	return d
 }

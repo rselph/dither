@@ -245,16 +245,16 @@ func gammaInit() {
 	decodeLUT = make([]uint16, 65536)
 	if gamma == 0.0 {
 		for i := 0; i < 65536; i++ {
-			decodeLUT[i] = uint16(sRGBDecode(float64(i)/65536.0) * 65536.0)
+			decodeLUT[i] = uint16(sRGBDecode(float64(i)/65535.0) * 65535.0)
 		}
 	} else {
 		for i := 0; i < 65536; i++ {
-			decodeLUT[i] = uint16(gammaDecode(float64(i)/65536.0) * 65536.0)
+			decodeLUT[i] = uint16(gammaDecode(float64(i)/65535.0) * 65535.0)
 		}
 	}
 	encodeLUT = make([]uint16, 65536)
 	for i := 0; i < 65536; i++ {
-		encodeLUT[i] = uint16(sRGBEncode(float64(i)/65536.0) * 65536.0)
+		encodeLUT[i] = uint16(sRGBEncode(float64(i)/65535.0) * 65535.0)
 	}
 }
 

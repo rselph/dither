@@ -19,7 +19,7 @@ import (
 	"golang.org/x/image/tiff"
 )
 
-var (
+type imageParams struct {
 	xBlocks       int
 	yBlocks       int
 	seed          int64
@@ -28,38 +28,46 @@ var (
 	gamma         float64
 	colorDither   bool
 	blurRadius    float64
-)
+	decodeLUT     []uint16
+}
+
+var config imageParams
 
 const A = 0.985
 
 func main() {
-	flag.IntVar(&xBlocks, "x", 0, "Blocks on horizontal side.")
-	flag.IntVar(&yBlocks, "y", 0, "Blocks on vertical side.")
-	flag.Int64Var(&seed, "r", 0, "Random number seed for dithering.")
-	flag.BoolVar(&smooth, "s", false, "Produce smoother look.")
-	flag.BoolVar(&rescaleOutput, "o", false, "Output image is one pixel per block.")
-	flag.Float64Var(&gamma, "g", 0.0, "Gamma of input image. If 0.0, then assume sRGB.")
-	flag.BoolVar(&colorDither, "c", false, "Dither in color.")
-	flag.Float64Var(&blurRadius, "b", 1.0, "Blur radius (zero to disable)")
+	flag.IntVar(&config.xBlocks, "x", 0, "Blocks on horizontal side.")
+	flag.IntVar(&config.yBlocks, "y", 0, "Blocks on vertical side.")
+	flag.Int64Var(&config.seed, "r", 0, "Random number seed for dithering.")
+	flag.BoolVar(&config.smooth, "s", false, "Produce smoother look.")
+	flag.BoolVar(&config.rescaleOutput, "o", false, "Output image is one pixel per block.")
+	flag.Float64Var(&config.gamma, "g", 0.0, "Gamma of input image. If 0.0, then assume sRGB.")
+	flag.BoolVar(&config.colorDither, "c", false, "Dither in color.")
+	flag.Float64Var(&config.blurRadius, "b", 1.0, "Blur radius (zero to disable)")
 	flag.Parse()
-	gammaInit()
+	outputGammaInit()
 
 	await := &sync.WaitGroup{}
 	for _, fname := range flag.Args() {
 		await.Add(1)
 		go func(filename string) {
 			defer await.Done()
-			dithered := ditherImage(imgFromFName(filename))
-			if blurRadius != 0.0 {
-				dithered = gaussianBlur(dithered, blurRadius)
-			}
-			save(dithered, filename)
+			go config.do(filename)
 		}(fname)
 	}
 	await.Wait()
 }
 
-func imgFromFName(fname string) image.Image {
+func (p *imageParams) do(filename string) {
+	p.gammaInit()
+	dithered := p.ditherImage(p.imgFromFName(filename))
+	if p.blurRadius != 0.0 {
+		dithered = gaussianBlur(dithered, p.blurRadius)
+	}
+	p.save(dithered, filename)
+}
+
+func (p *imageParams) imgFromFName(fname string) image.Image {
 	f, err := os.Open(fname)
 	if err != nil {
 		log.Fatal(err)
@@ -71,12 +79,12 @@ func imgFromFName(fname string) image.Image {
 		log.Fatal(err)
 	}
 
-	return transcode(img, decodeLUT)
+	return transcode(img, p.decodeLUT)
 }
 
-func save(i image.Image, name string) {
+func (p *imageParams) save(i image.Image, name string) {
 	var typeName string
-	if smooth {
+	if p.smooth {
 		typeName = "s"
 	} else {
 		typeName = "d"
@@ -88,17 +96,17 @@ func save(i image.Image, name string) {
 	)
 
 	switch {
-	case xBlocks != 0 && yBlocks != 0:
-		sizeX = xBlocks
-		sizeY = yBlocks
+	case p.xBlocks != 0 && p.yBlocks != 0:
+		sizeX = p.xBlocks
+		sizeY = p.yBlocks
 
-	case xBlocks == 0 && yBlocks != 0:
-		sizeX = yBlocks * i.Bounds().Size().X / i.Bounds().Size().Y
-		sizeY = yBlocks
+	case p.xBlocks == 0 && p.yBlocks != 0:
+		sizeX = p.yBlocks * i.Bounds().Size().X / i.Bounds().Size().Y
+		sizeY = p.yBlocks
 
-	case xBlocks != 0 && yBlocks == 0:
-		sizeX = xBlocks
-		sizeY = xBlocks * i.Bounds().Size().Y / i.Bounds().Size().X
+	case p.xBlocks != 0 && p.yBlocks == 0:
+		sizeX = p.xBlocks
+		sizeY = p.xBlocks * i.Bounds().Size().Y / i.Bounds().Size().X
 
 	default:
 		sizeX = i.Bounds().Size().X
@@ -121,19 +129,19 @@ func save(i image.Image, name string) {
 var white = color.Gray16{Y: 65535}
 var black = color.Gray16{Y: 0}
 
-func ditherImage(i image.Image) image.Image {
-	if xBlocks == 0 && yBlocks == 0 {
-		return ditherImage1to1(i)
+func (p *imageParams) ditherImage(i image.Image) image.Image {
+	if p.xBlocks == 0 && p.yBlocks == 0 {
+		return p.ditherImage1to1(i)
 	}
 
-	smaller := resize.Resize(uint(xBlocks), uint(yBlocks), i, resize.Lanczos3)
-	dith := ditherImage1to1(smaller)
+	smaller := resize.Resize(uint(p.xBlocks), uint(p.yBlocks), i, resize.Lanczos3)
+	dith := p.ditherImage1to1(smaller)
 	finalWidth := uint(i.Bounds().Size().X)
 	finalHeight := uint(i.Bounds().Size().Y)
-	if smooth {
+	if p.smooth {
 		return resize.Resize(finalWidth, finalHeight, dith, resize.Bicubic)
 	} else {
-		if rescaleOutput {
+		if p.rescaleOutput {
 			return dith
 		} else {
 			return resize.Resize(finalWidth, finalHeight, dith, resize.NearestNeighbor)
@@ -141,9 +149,9 @@ func ditherImage(i image.Image) image.Image {
 	}
 }
 
-func ditherImage1to1(i image.Image) image.Image {
-	if colorDither {
-		return ditherImage1to1Color(i)
+func (p *imageParams) ditherImage1to1(i image.Image) image.Image {
+	if p.colorDither {
+		return p.ditherImage1to1Color(i)
 	}
 
 	b := i.Bounds()
@@ -154,7 +162,7 @@ func ditherImage1to1(i image.Image) image.Image {
 		wg.Add(1)
 		go func(y int) {
 			defer wg.Done()
-			r := rand.New(rand.NewSource(seed + int64(y)))
+			r := rand.New(rand.NewSource(p.seed + int64(y)))
 			for x := b.Min.X; x < b.Max.X; x += 1 {
 				value := color.Gray16Model.Convert(i.At(x, y)).(color.Gray16)
 				randVal := uint16(r.Uint32())
@@ -171,7 +179,7 @@ func ditherImage1to1(i image.Image) image.Image {
 	return d
 }
 
-func ditherImage1to1Color(i image.Image) image.Image {
+func (p *imageParams) ditherImage1to1Color(i image.Image) image.Image {
 	b := i.Bounds()
 	d := image.NewRGBA64(b)
 
@@ -180,7 +188,7 @@ func ditherImage1to1Color(i image.Image) image.Image {
 		wg.Add(1)
 		go func(y int) {
 			defer wg.Done()
-			r := rand.New(rand.NewSource(seed + int64(y)))
+			r := rand.New(rand.NewSource(p.seed + int64(y)))
 			for x := b.Min.X; x < b.Max.X; x += 1 {
 				rval, gval, bval, aval := i.At(x, y).RGBA()
 				if uint16(r.Uint32()) < uint16(rval) {
@@ -199,10 +207,10 @@ func ditherImage1to1Color(i image.Image) image.Image {
 					bval = 0
 				}
 				d.SetRGBA64(x, y, color.RGBA64{
-					uint16(rval),
-					uint16(gval),
-					uint16(bval),
-					uint16(aval),
+					R: uint16(rval),
+					G: uint16(gval),
+					B: uint16(bval),
+					A: uint16(aval),
 				})
 			}
 		}(y)
@@ -212,7 +220,7 @@ func ditherImage1to1Color(i image.Image) image.Image {
 	return d
 }
 
-func gammaDecode(in float64) float64 {
+func gammaDecode(in, gamma float64) float64 {
 	return A * math.Pow(in, gamma)
 }
 
@@ -237,24 +245,26 @@ func sRGBEncode(in float64) float64 {
 }
 
 var (
-	decodeLUT []uint16
 	encodeLUT []uint16
 )
 
-func gammaInit() {
-	decodeLUT = make([]uint16, 65536)
-	if gamma == 0.0 {
-		for i := 0; i < 65536; i++ {
-			decodeLUT[i] = uint16(sRGBDecode(float64(i)/65535.0) * 65535.0)
-		}
-	} else {
-		for i := 0; i < 65536; i++ {
-			decodeLUT[i] = uint16(gammaDecode(float64(i)/65535.0) * 65535.0)
-		}
-	}
+func outputGammaInit() {
 	encodeLUT = make([]uint16, 65536)
 	for i := 0; i < 65536; i++ {
 		encodeLUT[i] = uint16(sRGBEncode(float64(i)/65535.0) * 65535.0)
+	}
+}
+
+func (p *imageParams) gammaInit() {
+	p.decodeLUT = make([]uint16, 65536)
+	if p.gamma == 0.0 {
+		for i := 0; i < 65536; i++ {
+			p.decodeLUT[i] = uint16(sRGBDecode(float64(i)/65535.0) * 65535.0)
+		}
+	} else {
+		for i := 0; i < 65536; i++ {
+			p.decodeLUT[i] = uint16(gammaDecode(float64(i)/65535.0, p.gamma) * 65535.0)
+		}
 	}
 }
 
@@ -266,10 +276,10 @@ func transcode(in image.Image, lut []uint16) image.Image {
 		for x := b.Min.X; x < b.Max.X; x += 1 {
 			rval, gval, bval, aval := in.At(x, y).RGBA()
 			out.SetRGBA64(x, y, color.RGBA64{
-				lut[rval],
-				lut[gval],
-				lut[bval],
-				lut[aval],
+				R: lut[rval],
+				G: lut[gval],
+				B: lut[bval],
+				A: lut[aval],
 			})
 		}
 	}

@@ -45,6 +45,7 @@ func main() {
 	flag.BoolVar(&config.colorDither, "c", false, "Dither in color.")
 	flag.Float64Var(&config.blurRadius, "b", 1.0, "Blur radius (zero to disable)")
 	flag.Parse()
+
 	outputGammaInit()
 
 	await := &sync.WaitGroup{}
@@ -52,7 +53,7 @@ func main() {
 		await.Add(1)
 		go func(filename string) {
 			defer await.Done()
-			go config.do(filename)
+			config.do(filename)
 		}(fname)
 	}
 	await.Wait()

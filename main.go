@@ -280,7 +280,7 @@ func transcode(in image.Image, lut []uint16) image.Image {
 				R: lut[rval],
 				G: lut[gval],
 				B: lut[bval],
-				A: lut[aval],
+				A: uint16(aval),
 			})
 		}
 	}
@@ -479,7 +479,7 @@ func (v *colorVal) times(n float64) (product *colorVal) {
 		r: v.r * n,
 		g: v.g * n,
 		b: v.b * n,
-		a: v.a * n,
+		a: v.a,
 	}
 	return
 }
@@ -488,30 +488,26 @@ func (v *colorVal) increment(n *colorVal) {
 	v.r += n.r
 	v.g += n.g
 	v.b += n.b
-	v.a += n.a
 }
 
 func (v *colorVal) incrementInt(n color.Color) {
-	r, g, b, a := n.RGBA()
+	r, g, b, _ := n.RGBA()
 	v.r += float64(r)
 	v.g += float64(g)
 	v.b += float64(b)
-	v.a += float64(a)
 }
 
 func (v *colorVal) decrement(n *colorVal) {
 	v.r -= n.r
 	v.g -= n.g
 	v.b -= n.b
-	v.a -= n.a
 }
 
 func (v *colorVal) decrementInt(n color.Color) {
-	r, g, b, a := n.RGBA()
+	r, g, b, _ := n.RGBA()
 	v.r -= float64(r)
 	v.g -= float64(g)
 	v.b -= float64(b)
-	v.a -= float64(a)
 }
 
 func (v *colorVal) asColor(factor float64) color.Color {

@@ -526,6 +526,6 @@ func (v *colorVal) asColor(factor float64) color.Color {
 		R: uint16(math.Round(v.r * factor)),
 		G: uint16(math.Round(v.g * factor)),
 		B: uint16(math.Round(v.b * factor)),
-		A: uint16(math.Round(v.a * factor)),
+		A: uint16(math.Round(v.a)),
 	}
 }

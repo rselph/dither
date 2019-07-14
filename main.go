@@ -13,6 +13,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/nfnt/resize"
@@ -48,8 +49,18 @@ func main() {
 
 	outputGammaInit()
 
-	await := &sync.WaitGroup{}
+	var expandedList []string
 	for _, fname := range flag.Args() {
+		matches, err := filepath.Glob(fname)
+		if err == nil && matches != nil {
+			expandedList = append(expandedList, matches...)
+		} else {
+			expandedList = append(expandedList, fname)
+		}
+	}
+
+	await := &sync.WaitGroup{}
+	for _, fname := range expandedList {
 		await.Add(1)
 		go func(filename string) {
 			defer await.Done()

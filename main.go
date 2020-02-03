@@ -2,8 +2,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"flag"
 	"fmt"
+	"hash/crc64"
 	"image"
 	"image/color"
 	_ "image/gif"
@@ -174,7 +177,7 @@ func (p *imageParams) ditherImage1to1(i image.Image) image.Image {
 		wg.Add(1)
 		go func(y int) {
 			defer wg.Done()
-			r := rand.New(rand.NewSource(p.seed + int64(y)))
+			r := rand.New(newRandSource(p.seed, int64(y)))
 			for x := b.Min.X; x < b.Max.X; x += 1 {
 				value := color.Gray16Model.Convert(i.At(x, y)).(color.Gray16)
 				randVal := uint16(r.Uint32())
@@ -200,7 +203,7 @@ func (p *imageParams) ditherImage1to1Color(i image.Image) image.Image {
 		wg.Add(1)
 		go func(y int) {
 			defer wg.Done()
-			r := rand.New(rand.NewSource(p.seed + int64(y)))
+			r := rand.New(newRandSource(p.seed, int64(y)))
 			for x := b.Min.X; x < b.Max.X; x += 1 {
 				rval, gval, bval, aval := i.At(x, y).RGBA()
 				if uint16(r.Uint32()) < uint16(rval) {
@@ -230,6 +233,17 @@ func (p *imageParams) ditherImage1to1Color(i image.Image) image.Image {
 	wg.Wait()
 
 	return d
+}
+
+var crcTable = crc64.MakeTable(crc64.ECMA)
+
+func newRandSource(seed, delta int64) (s rand.Source) {
+	w := &bytes.Buffer{}
+	_ = binary.Write(w, binary.LittleEndian, seed)
+	_ = binary.Write(w, binary.LittleEndian, delta)
+	h := crc64.Checksum(w.Bytes(), crcTable)
+	s = rand.NewSource(int64(h))
+	return
 }
 
 func gammaDecode(in, gamma float64) float64 {

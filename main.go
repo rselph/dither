@@ -33,6 +33,7 @@ type imageParams struct {
 	colorDither   bool
 	blurRadius    float64
 	decodeLUT     []uint16
+	layers        int
 }
 
 var config imageParams
@@ -48,6 +49,7 @@ func main() {
 	flag.Float64Var(&config.gamma, "g", 0.0, "Gamma of input image. If 0.0, then assume sRGB.")
 	flag.BoolVar(&config.colorDither, "c", false, "Dither in color.")
 	flag.Float64Var(&config.blurRadius, "b", 1.0, "Blur radius (zero to disable)")
+	flag.IntVar(&config.layers, "l", 1, "Number of layers")
 	flag.Parse()
 
 	outputGammaInit()
@@ -75,7 +77,49 @@ func main() {
 
 func (p *imageParams) do(filename string) {
 	p.gammaInit()
-	dithered := p.ditherImage(p.imgFromFName(filename))
+	i := p.imgFromFName(filename)
+
+	var p2 imageParams
+	p2 = *p
+
+	if p2.xBlocks == 0 {
+		if p2.yBlocks == 0 {
+			p2.xBlocks = i.Bounds().Dx()
+		} else {
+			p2.xBlocks = int(float64(p2.yBlocks) / float64(i.Bounds().Dy()) * float64(i.Bounds().Dx()))
+		}
+	}
+
+	if p2.yBlocks == 0 {
+		if p2.xBlocks == 0 {
+			p2.yBlocks = i.Bounds().Dx()
+		} else {
+			p2.yBlocks = int(float64(p2.xBlocks) / float64(i.Bounds().Dx()) * float64(i.Bounds().Dy()))
+		}
+	}
+
+	var layers []image.Image
+	for layer := 0; layer < p2.layers; layer++ {
+		layers = append(layers, p2.ditherImage(i))
+
+		if p2.xBlocks == 0 {
+			p2.xBlocks = (i.Bounds().Max.X - i.Bounds().Min.X) / 2
+		} else {
+			p2.xBlocks /= 2
+		}
+		if p2.yBlocks == 0 {
+			p2.yBlocks = (i.Bounds().Max.Y - i.Bounds().Min.Y) / 2
+		} else {
+			p2.yBlocks /= 2
+		}
+
+		if p2.xBlocks == 0 || p2.yBlocks == 0 {
+			break
+		}
+	}
+
+	dithered := layer(layers)
+
 	if p.blurRadius != 0.0 {
 		dithered = gaussianBlur(dithered, p.blurRadius)
 	}
@@ -143,6 +187,34 @@ func (p *imageParams) save(i image.Image, name string) {
 
 var white = color.Gray16{Y: 65535}
 var black = color.Gray16{Y: 0}
+
+func layer(imgs []image.Image) image.Image {
+	if len(imgs) < 1 {
+		return nil
+	}
+
+	scale := 1.0 / float64(len(imgs))
+	i := imgs[0]
+	sum := image.NewRGBA64(i.Bounds())
+
+	var wg sync.WaitGroup
+	for y := i.Bounds().Min.Y; y < i.Bounds().Max.Y; y++ {
+		wg.Add(1)
+		go func(y int) {
+			defer wg.Done()
+			for x := i.Bounds().Min.X; x < i.Bounds().Max.X; x++ {
+				var s colorVal
+				for _, i := range imgs {
+					s.incrementInt(i.At(x, y))
+				}
+				s.a = 65535.0
+				sum.Set(x, y, s.asColor(scale))
+			}
+		}(y)
+	}
+	wg.Wait()
+	return sum
+}
 
 func (p *imageParams) ditherImage(i image.Image) image.Image {
 	if p.xBlocks == 0 && p.yBlocks == 0 {

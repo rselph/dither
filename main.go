@@ -145,8 +145,21 @@ func (p *imageParams) save(i image.Image, name string) {
 	var typeName string
 	if p.smooth {
 		typeName = "s"
-	} else {
-		typeName = "d"
+	}
+	if p.colorDither {
+		typeName += "c"
+	}
+	if p.rescaleOutput {
+		typeName += "r"
+	}
+	if p.layers != 1 {
+		typeName += fmt.Sprintf("l%d", p.layers)
+	}
+	if p.blurRadius != 1.0 {
+		typeName += fmt.Sprintf("b%f", p.blurRadius)
+	}
+	if p.seed != 0 {
+		typeName += fmt.Sprintf("r%d", p.seed)
 	}
 
 	var (
@@ -172,7 +185,7 @@ func (p *imageParams) save(i image.Image, name string) {
 		sizeY = i.Bounds().Size().Y
 	}
 
-	w, err := os.Create(fmt.Sprintf("%s.%s%04dx%04d.tiff", name, typeName, sizeX, sizeY))
+	w, err := os.Create(fmt.Sprintf("%s.%s.%04dx%04d.tiff", name, typeName, sizeX, sizeY))
 	if err != nil {
 		log.Fatal(err)
 	}

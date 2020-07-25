@@ -161,6 +161,9 @@ func (p *imageParams) save(i image.Image, name string) {
 	if p.seed != 0 {
 		typeName += fmt.Sprintf("r%d", p.seed)
 	}
+	if typeName != "" {
+		typeName += "."
+	}
 
 	var (
 		sizeX int
@@ -185,7 +188,7 @@ func (p *imageParams) save(i image.Image, name string) {
 		sizeY = i.Bounds().Size().Y
 	}
 
-	w, err := os.Create(fmt.Sprintf("%s.%s.%04dx%04d.tiff", name, typeName, sizeX, sizeY))
+	w, err := os.Create(fmt.Sprintf("%s.%s%04dx%04d.tiff", name, typeName, sizeX, sizeY))
 	if err != nil {
 		log.Fatal(err)
 	}
